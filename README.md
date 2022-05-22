@@ -2,43 +2,18 @@
 
 Dump quarantined files from Windows Defender
 
-![](demo.gif)
-
 ## Description
 
-Forensically list and extract quarantined files from a mounted disk. Extracted files are put into a tar archive in order to prevent accidental triggering of Defender Real-time protection.
+Given the the quarantined file in the current working directory, decrypt the file.
 
 **Update:** for a more robust version supporting multiple AVs see [maldump](https://github.com/NUKIB/maldump)
 
 ## Usage
 
-### On Windows
+defender-dump.py --dump
 
-List quarantine files located on disk C
-
-```cmd
-> python3 defender-dump.py C:\
-```
-
-Dump quarantine files from disk C into archive `quarantine.tar`
-
-```cmd
-> python3 defender-dump.py C:\ --dump
-```
-
-List quarantine files located on disk G, mounted with FTK Imager using the **File System/Read Only** method
-
-```cmd
-> python3 defender-dump.py G:\[root]\
-```
-
-### On Linux
-
-List quarantine files from a mounted windows partition on `/mnt/win`
-
-```bash
-> ./defender-dump.py /mnt/win
-```
+###
+Sample Files are both Eicar test files, one has the corresponding entries file, meaning file metadata can be recovered. The second does not, meaning the file can be decrypted but the original file name is not recovered.
 
 ## Limitation
 

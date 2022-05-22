@@ -5,17 +5,30 @@ Dumps quarantined files from Windows Defender
 By Nikola Knežević - 2021
 
 Inspired by https://github.com/ernw/quarantine-formats
+
+Modified by Caoimhin to decrypt quarantined files from the working directory - 2022
 '''
 
+from importlib.resources import path
 import io
 import struct
 import argparse
 import datetime
 import pathlib
 import tarfile
+import re 
 
 from collections import namedtuple
 file_record = namedtuple("file_record", "path hash detection filetime")
+
+def get_resource(basedir):
+    files = []
+    for file in basedir.glob("*"):
+        filematch = re.findall(r"^.*\\([0-9A-F]{40})$",str(file))
+        if(filematch):
+            files.append(filematch[0])
+    return files
+
 
 def mse_ksa():
     # hardcoded key obtained from mpengine.dll
@@ -85,22 +98,35 @@ def unpack_malware(f):
 def dump_entries(basedir, entries):
 
     tar = tarfile.open('quarantine.tar', 'w')
+    files_decrypted = []
+    resource_data = get_resource(basedir)
 
-    for file_rec in entries:
-        quarfile = basedir / 'ResourceData' / file_rec.hash[:2] / file_rec.hash
+    for file_rec in entries: # Get entrie data in current folder
+        quarfile = basedir / file_rec.hash
 
         if not quarfile.exists():
             continue
 
         with open(quarfile, 'rb') as f:
 
-            print(f'Exporting {file_rec.path.name}')
+            print(f'Quarantined from: {file_rec.path} Exporting  {file_rec.path.name}')
+            files_decrypted.append(file_rec.hash) # track what files were decrypted
             malfile, malfile_len = unpack_malware(f)
 
             tarinfo = tarfile.TarInfo(file_rec.path.name)
             tarinfo.size = malfile_len
             tar.addfile(tarinfo, io.BytesIO(malfile))
+    # Decrypt files that did not have entry file
+    for resource_data_file in resource_data:
+        if(resource_data_file not in files_decrypted):
+            with open(resource_data_file, 'rb') as f:
+                print(f'Exporting {resource_data_file+"_decrypted"}')
+                files_decrypted.append(resource_data_file) # track what files were decrypted
+                malfile, malfile_len = unpack_malware(f)
 
+                tarinfo = tarfile.TarInfo(resource_data_file+"_decrypted")
+                tarinfo.size = malfile_len
+                tar.addfile(tarinfo, io.BytesIO(malfile))
     tar.close()
 
     print("File 'quarantine.tar' successfully created")
@@ -130,7 +156,7 @@ def get_entry(data):
 def parse_entries(basedir):
 
     results = []
-    for guid in basedir.glob('Entries/{*}'):
+    for guid in basedir.glob('{*}'):
         with open(guid, 'rb') as f:
             header = rc4_decrypt(f.read(0x3c))
             data1_len, data2_len = struct.unpack_from('<II', header, 0x28)
@@ -153,26 +179,17 @@ def parse_entries(basedir):
 
 def main(args):
 
-    basedir = args.rootdir / 'ProgramData/Microsoft/Windows Defender/Quarantine'
+    basedir = pathlib.Path.cwd()
 
     entries = parse_entries(basedir)
 
     if args.dump:
         # export quarantine files
         dump_entries(basedir, entries)
-    else:
-        # display quarantine files
-        detection_max_len = max([len(x[2]) for x in entries])
-        for entry in entries:
-            print(entry.filetime, f"{entry.detection:<{detection_max_len}}", entry.path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
            description='Dump quarantined files from Windows Defender'
-    )
-    parser.add_argument(
-            'rootdir', type=pathlib.Path,
-            help='root directory where Defender is installed (example C:\)'
     )
     parser.add_argument(
             '-d', '--dump', action='store_true',
