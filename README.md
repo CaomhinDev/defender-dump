@@ -18,6 +18,7 @@ Sample Files are both Eicar test files, one has the corresponding entries file, 
 - Place ResourceData file(s) in the same folder as Python script
 - Place Entries folder file(s) in the directory also (optional)
 - defender-dump.py --dump
+- tar -xf quarantine.tar
 
 ## Limitation
 
